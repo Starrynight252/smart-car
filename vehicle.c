@@ -1,5 +1,6 @@
 #include"vehicle.h"
 #include"UART.h"
+#include"EEPROM.h"
 
 /*#################定义变量#######################*/
 uchar Mode_Selection;  //模式选择
@@ -24,8 +25,13 @@ void Car_Initi()
 	//变量
 	Mode_Selection='F';  //模式选择
 	MOTOR_Pwmcount =80;
-	SE_PwmCount=SE_TIMINGLNITIAL;  //PWM电机频率
 	MOTOR_PwmTime=0;
+	/*舵机初始化-IAP_ADDRESS+1 校验位*/
+	if(IapReadByte(IAP_ADDRESS+1)=='Y')
+		SE_PwmCount=IapReadNum(IAP_ADDRESS);  //舵机初始化为读入EEPROM
+	else
+		SE_PwmCount=SE_TIMINGLNITIAL;  //舵机初始化为默认SE_TIMINGLNITIAL
+
 	SE_PwmTime=0;   //PWM时间
 
 	//定时器
@@ -37,6 +43,7 @@ void Car_Initi()
 	TMOD|=0x01;
 	TR0=1;
 	ET0=1;
+
 }
 
 /*停止*/
@@ -90,7 +97,12 @@ void Parameter_Steering(const uchar direction)
 {
 	if(direction=='O')
 	{
-		SE_PwmCount=SE_TIMINGLNITIAL;  //舵机初始
+		/*舵机初始化-IAP_ADDRESS+1 校验位*/
+		if(IapReadByte(IAP_ADDRESS+1)=='Y')
+			SE_PwmCount=IapReadNum(IAP_ADDRESS);  //舵机初始化为读入EEPROM
+		else
+			SE_PwmCount=SE_TIMINGLNITIAL;  //舵机初始化为默认SE_TIMINGLNITIAL
+
 	}
 	else if(direction== 'L')
 	{	 /*左转*/
@@ -133,14 +145,52 @@ Front_bool Steering_HoldingTime(const uchar direction,const uint keepus,const ui
 	return false;		
 }
 
-//停车设置速度参数
-uint Stop_SettingSpeed_Parameters(uint Modernspeed)
-{
-	uint Pastspeed=MOTOR_Pwmcount;
+// 停车，使用户校准舵机
+void SteeringGear_Calibration()
+{	
+	uchar CalibrationValue='0';//校准值
+	uchar Calibration='N'; //校准位
+	int i=0;
+	rbusy=false;
+	
+   	RESTART:
 	Vehicle_Stop();	//停车
+	SendString("请输入舵机校准值:\r\n");
 
-	MOTOR_Pwmcount=Modernspeed;
-	return Pastspeed;
+	while(!rbusy) ;	//使用输入串口状态判断
+
+	CalibrationValue=info;
+	rbusy=false;
+
+   	SendString("舵机校准值:");
+	SendNum(CalibrationValue%48);
+	INPUTERROR:
+
+	SendString("是否保存舵机值(‘Y’or'N':\r\n");
+
+	while(!rbusy) ;	//使用输入串口状态判断值
+
+	Calibration=info; //校准位
+	rbusy=false;
+
+	if(Calibration=='Y')
+	{
+		IapEraseSector(IAP_ADDRESS);	//删除一个扇区区域
+
+		IapProgramByte(IAP_ADDRESS,CalibrationValue);  //写入一个扇区区域
+		IapProgramByte(IAP_ADDRESS+1,Calibration);  //写入一个扇区区域
+
+		Delay(2);
+		SendString("\r\n舵机校准值:");
+		SendByte(IapReadByte(IAP_ADDRESS));
+		SendByte(IapReadByte(IAP_ADDRESS+1));
+		SendString("\r\n");
+	}
+	else if(Calibration=='N')
+		goto RESTART;
+	else
+		goto INPUTERROR;
+		
 }
 
 /**设置速度-根据输入的数值
@@ -215,6 +265,8 @@ Front_bool SpeedMode_Din(uchar command)
 			case'L': Low_Beam =~Low_Beam; //近光灯
 				break; 
 			case'Q': R_Horn =~R_Horn;//喇叭-提醒
+				break;
+			case'C': SteeringGear_Calibration(); 	//停车，使用户校准舵机 
 				break;	 
 			case'c': Peripheral =~Peripheral; 	//外围设备 
 				break;	 

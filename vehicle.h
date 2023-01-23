@@ -14,7 +14,7 @@ extern Front_bool busy,rbusy;  //串口状态
 #define P1_INIT 0xFF    //0X80     //0x00
 #define LAMP_P2_INIT 0xFF    //0X80     //0x00
 /*******舵机状态定义********/
-#define SE_TIMINGLNITIAL 10      //舵机初始计时
+#define SE_TIMINGLNITIAL 9      //舵机初始计时
 #define SE_RANGEMAX 17      //舵机范围
 #define SE_RANGEMIN 0      //舵机范围
 #define SE_TIMINGMAX 30			  //舵机计时上限
@@ -32,6 +32,7 @@ extern Front_bool busy,rbusy;  //串口状态
 * B_Horn口80us变化,设置定时器0		*
 *-无参数                            *
 *-无返回值			                */
+void Car_Initi();
 void Car_Initi();
 /************************************
 *-名称: Vehicle_Stop                *
@@ -87,14 +88,16 @@ void Parameter_Steering(uchar direction);
 Front_bool Steering_HoldingTime(const uchar direction,const uint keepus,const uint angle);
 
 /**********************************************
-*-名称: Stop_SettingSpeed_Parameters   		  *
-*-函数功能: 停车设置速度参数                  *
-*-后果:停车,使用Modernspeed参数设置速度并且	  *
-* 返回原来的速度						      *
-*-参数:										  *
-*#uint Modernspeed  设置的速度		     	  *
-*-uint类型返回值-原来速度(uint)			      */
-uint Stop_SettingSpeed_Parameters(uint Modernspeed);
+*-名称: SteeringGear_Calibration   		      *
+*-函数功能: 停车，使用户校准舵机		      *
+*并且保存在EEPROM，以后使用EEPROM内置值，除非 *
+*IAP_ADDRESS+1区域被改为‘N’                   *     
+*-副作用:停车EEPROM的IAP_ADDRESS&&			  *
+*IAP_ADDRESS+1区域被使用(原值删除，并且	      *
+*写入新值)！        *						  *
+*-返回值：无				     		      *
+*-参数:无									  *		      */
+void SteeringGear_Calibration();
 /**********************************************
 *-名称: Speed_Value                           *
 *-函数功能: 停车设置速度参数                  *
